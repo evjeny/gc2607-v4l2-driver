@@ -9,43 +9,41 @@ echo ""
 # Resolve the real camera/sensor nodes before touching v4l2loopback.
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/camera_env.sh"
 
-# Kill gstreamer if running
-echo "Stopping gstreamer pipeline..."
-pkill -f "gst-launch.*video48" 2>/dev/null || true
+# Kill any previous feed
+echo "Stopping any running gstreamer feed..."
+pkill -f "gst-launch.*v4l2sink" 2>/dev/null || true
 sleep 1
 
-# Unload v4l2loopback
-echo "Unloading v4l2loopback..."
-sudo modprobe -r v4l2loopback
+# v4l2-relayd holds the boot-time loopback open; stop it so we can reset cleanly.
+echo "Stopping v4l2-relayd and reloading v4l2loopback (Chrome-compatible)..."
+sudo systemctl stop v4l2-relayd 2>/dev/null || true
 sleep 1
-
-# Reload with Chrome-friendly parameters
-echo "Loading v4l2loopback with Chrome-compatible settings..."
+sudo modprobe -r v4l2loopback 2>/dev/null || true
 sudo modprobe v4l2loopback \
     devices=1 \
-    video_nr=50 \
     card_label="GC2607 RGB Camera" \
     exclusive_caps=1 \
     max_buffers=2
+sleep 1
 
-echo ""
 echo "✅ v4l2loopback reloaded"
 echo ""
 
-# Find the new device (try both possible names)
-VIRT_DEV=$(v4l2-ctl --list-devices | grep -A1 "GC2607 RGB" | grep "/dev/video" | tr -d '\t' | head -1)
-
-if [ -z "$VIRT_DEV" ]; then
-    # Fallback to video50 if we can't find it by name
-    if [ -e /dev/video50 ]; then
-        VIRT_DEV=/dev/video50
-    else
-        echo "❌ Error: Could not find virtual camera device"
-        exit 1
+# Detect the loopback device by driver name (video_nr is auto-assigned).
+VIRT_DEV=""
+for d in /dev/video*; do
+    [ -e "$d" ] || continue
+    if [ "$(v4l2-ctl -d "$d" --info 2>/dev/null | awk -F': ' '/Driver name/{print $2}')" = "v4l2 loopback" ]; then
+        VIRT_DEV="$d"; break
     fi
+done
+if [ -z "$VIRT_DEV" ]; then
+    echo "❌ Error: Could not find virtual camera device"
+    exit 1
 fi
 
-echo "Virtual camera: $VIRT_DEV"
+echo "Real camera:    $CAM_DEV"
+echo "Virtual camera: $VIRT_DEV  (label: \"GC2607 RGB Camera\")"
 echo ""
 
 # Set optimal exposure/gain for good brightness
@@ -80,4 +78,4 @@ gst-launch-1.0 -v \
     frei0r-filter-coloradj-rgb r=$R_PARAM g=$G_PARAM b=$B_PARAM keep-luma=false ! \
     videoconvert ! \
     "video/x-raw,format=I420,framerate=24/1" ! \
-    v4l2sink device=$VIRT_DEV
+    v4l2sink device=$VIRT_DEV sync=false

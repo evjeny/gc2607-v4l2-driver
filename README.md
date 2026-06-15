@@ -181,10 +181,23 @@ sudo ./init_camera.sh
 
 Now in OBS Studio:
 1. Add Source → Video Capture Device (V4L2)
-2. Select device: **"GC2607 RGB"** from the dropdown
+2. Select device: **"GC2607 Camera"** from the dropdown
 3. The camera will appear with proper RGB colors and correct orientation
 
 **Note:** The `create_virtual_camera.sh` script must keep running while using the camera.
+
+#### About `v4l2-relayd` (Ubuntu)
+
+Ubuntu ships `v4l2-relayd`, which holds the boot-time "Intel MIPI Camera"
+loopback open to bridge *libcamera* sensors. The GC2607 isn't a libcamera
+sensor, so that loopback stays empty and **locked** — nothing can feed it.
+`create_virtual_camera.sh` / `reload_for_chrome.sh` therefore **stop
+`v4l2-relayd` and reload `v4l2loopback`** before feeding it, then auto-detect
+the resulting `/dev/videoN`. To avoid stopping it on every run, disable it once:
+
+```bash
+sudo systemctl mask --now v4l2-relayd
+```
 
 ### Using with Google Meet and Chrome/Chromium
 

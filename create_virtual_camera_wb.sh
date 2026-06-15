@@ -18,24 +18,35 @@ echo "White balance gains: R=$R_GAIN, G=$G_GAIN, B=$B_GAIN"
 echo "(Usage: $0 [r_gain] [g_gain] [b_gain])"
 echo ""
 
-# Check if v4l2loopback is installed
-if ! lsmod | grep -q v4l2loopback; then
-    echo "Installing v4l2loopback module..."
-    if ! dpkg -s v4l2loopback-dkms &>/dev/null; then
-        echo "Please install: sudo apt install v4l2loopback-dkms v4l2loopback-utils"
-        exit 1
-    fi
-    sudo modprobe v4l2loopback devices=1 video_nr=10 card_label="GC2607 RGB WB" exclusive_caps=1
+if ! dpkg -s v4l2loopback-dkms &>/dev/null; then
+    echo "Please install: sudo apt install v4l2loopback-dkms v4l2loopback-utils"
+    exit 1
 fi
 
-# Find the actual v4l2loopback device
-VIRT_DEV=$(v4l2-ctl --list-devices | grep -A1 "GC2607 RGB" | grep "/dev/video" | head -1 | tr -d '\t')
+# v4l2-relayd holds the boot-time loopback open; stop it, then reset the module
+# so our GStreamer producer can attach.
+echo "Stopping v4l2-relayd and resetting v4l2loopback (needs sudo)..."
+sudo systemctl stop v4l2-relayd 2>/dev/null || true
+sleep 1
+sudo modprobe -r v4l2loopback 2>/dev/null || true
+sudo modprobe v4l2loopback devices=1 card_label="GC2607 RGB WB" exclusive_caps=1 max_buffers=2
+sleep 1
+
+# Detect the loopback device by driver name (video_nr is auto-assigned).
+VIRT_DEV=""
+for d in /dev/video*; do
+    [ -e "$d" ] || continue
+    if [ "$(v4l2-ctl -d "$d" --info 2>/dev/null | awk -F': ' '/Driver name/{print $2}')" = "v4l2 loopback" ]; then
+        VIRT_DEV="$d"; break
+    fi
+done
 if [ -z "$VIRT_DEV" ]; then
     echo "Error: Could not find virtual camera device"
     exit 1
 fi
 
-echo "Virtual camera device: $VIRT_DEV"
+echo "Real camera:    $CAM_DEV"
+echo "Virtual camera: $VIRT_DEV  (label: \"GC2607 RGB WB\")"
 echo ""
 
 # Set optimal exposure/gain for good brightness
