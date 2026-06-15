@@ -6,6 +6,9 @@ set -e
 echo "=== Reloading v4l2loopback for Chrome compatibility ==="
 echo ""
 
+# Resolve the real camera/sensor nodes before touching v4l2loopback.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/camera_env.sh"
+
 # Kill gstreamer if running
 echo "Stopping gstreamer pipeline..."
 pkill -f "gst-launch.*video48" 2>/dev/null || true
@@ -48,7 +51,7 @@ echo ""
 # Set optimal exposure/gain for good brightness
 # Exposure: 2002 (max), Gain: 16 (max, LUT index)
 echo "Setting camera parameters..."
-v4l2-ctl -d /dev/v4l-subdev6 --set-ctrl exposure=2002,analogue_gain=16
+v4l2-ctl -d "$SUBDEV" --set-ctrl exposure=2002,analogue_gain=16
 
 # White balance gains (calculated from gray world)
 R_GAIN=1.034
@@ -68,7 +71,7 @@ echo ""
 
 # Start pipeline with white balance at 24fps for Chrome
 gst-launch-1.0 -v \
-    v4l2src device=/dev/video0 ! \
+    v4l2src device=$CAM_DEV ! \
     "video/x-bayer,format=grbg10le,width=1920,height=1080,framerate=24/1" ! \
     bayer2rgb ! \
     videoflip method=rotate-180 ! \

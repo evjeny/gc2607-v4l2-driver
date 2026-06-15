@@ -49,25 +49,29 @@ sleep 2
 echo "Checking driver probe..."
 dmesg | tail -20 | grep -E "gc2607|GC2607" || true
 
+# Resolve the actual camera/sensor nodes from the media graph.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/camera_env.sh"
+
 # Configure CSI2 formats (this is critical!)
 echo ""
 echo "Configuring CSI2 receiver formats..."
-media-ctl -d /dev/media0 -V '"Intel IPU6 CSI2 0":0 [fmt:SGRBG10_1X10/1920x1080]'
-media-ctl -d /dev/media0 -V '"Intel IPU6 CSI2 0":1 [fmt:SGRBG10_1X10/1920x1080]'
+media-ctl -d "$MEDIA_DEV" -V '"Intel IPU6 CSI2 0":0 [fmt:SGRBG10_1X10/1920x1080]'
+media-ctl -d "$MEDIA_DEV" -V '"Intel IPU6 CSI2 0":1 [fmt:SGRBG10_1X10/1920x1080]'
 
 # Set video device format
 echo "Configuring video device format..."
-v4l2-ctl -d /dev/video0 --set-fmt-video=width=1920,height=1080,pixelformat=BA10
+v4l2-ctl -d "$CAM_DEV" --set-fmt-video=width=1920,height=1080,pixelformat=BA10
 
 # Enable media link
 echo "Enabling media pipeline..."
-media-ctl -d /dev/media0 -l '"Intel IPU6 CSI2 0":1 -> "Intel IPU6 ISYS Capture 0":0[1]'
+media-ctl -d "$MEDIA_DEV" -l '"Intel IPU6 CSI2 0":1 -> "Intel IPU6 ISYS Capture 0":0[1]'
 
 echo ""
 echo "✅ Camera initialized successfully!"
+echo "   Camera: $CAM_DEV   Sensor: $SUBDEV"
 echo ""
 echo "Default settings:"
-v4l2-ctl -d /dev/v4l-subdev6 --list-ctrls | grep -E "(exposure|gain)"
+v4l2-ctl -d "$SUBDEV" --list-ctrls | grep -E "(exposure|gain)"
 echo ""
 echo "Quick capture test:"
 echo "  v4l2-ctl -d /dev/video0 --stream-mmap --stream-count=1 --stream-to=test.raw"

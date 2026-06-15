@@ -28,7 +28,7 @@ sudo modprobe intel-ipu6-isys
 sleep 2
 
 echo "Step 2: Loading GC2607 driver..."
-cd /home/abbood/dev/camera-driver-dev/gc2607-v4l2-driver
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Unload if already loaded
 if lsmod | grep -q gc2607; then
@@ -46,23 +46,27 @@ fi
 sudo insmod gc2607.ko
 sleep 2
 
+# Resolve the actual camera/sensor nodes (they are not fixed: v4l2loopback may
+# claim /dev/video0, and the subdev index depends on probe order).
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/camera_env.sh"
+
 echo "Step 3: Configuring camera formats..."
-media-ctl -d /dev/media0 -V '"Intel IPU6 CSI2 0":0 [fmt:SGRBG10_1X10/1920x1080]'
-media-ctl -d /dev/media0 -V '"Intel IPU6 CSI2 0":1 [fmt:SGRBG10_1X10/1920x1080]'
-v4l2-ctl -d /dev/video0 --set-fmt-video=width=1920,height=1080,pixelformat=BA10
-media-ctl -d /dev/media0 -l '"Intel IPU6 CSI2 0":1 -> "Intel IPU6 ISYS Capture 0":0[1]'
+media-ctl -d "$MEDIA_DEV" -V '"Intel IPU6 CSI2 0":0 [fmt:SGRBG10_1X10/1920x1080]'
+media-ctl -d "$MEDIA_DEV" -V '"Intel IPU6 CSI2 0":1 [fmt:SGRBG10_1X10/1920x1080]'
+v4l2-ctl -d "$CAM_DEV" --set-fmt-video=width=1920,height=1080,pixelformat=BA10
+media-ctl -d "$MEDIA_DEV" -l '"Intel IPU6 CSI2 0":1 -> "Intel IPU6 ISYS Capture 0":0[1]'
 
 echo "Step 4: Setting optimal exposure/gain..."
-v4l2-ctl -d /dev/v4l-subdev6 --set-ctrl exposure=2002,analogue_gain=14
+v4l2-ctl -d "$SUBDEV" --set-ctrl exposure=2002,analogue_gain=14
 
 echo ""
 echo "✅ Camera initialized successfully!"
 echo ""
-echo "Camera device: /dev/video0"
-echo "Control device: /dev/v4l-subdev6"
+echo "Camera device: $CAM_DEV"
+echo "Control device: $SUBDEV"
 echo ""
 echo "Current settings:"
-v4l2-ctl -d /dev/v4l-subdev6 --list-ctrls | grep -E "(exposure|gain)"
+v4l2-ctl -d "$SUBDEV" --list-ctrls | grep -E "(exposure|gain)"
 echo ""
 echo "========================================"
 echo "  Next Steps"
@@ -76,8 +80,8 @@ echo "Option 2: Quick Capture Test"
 echo "  ./quick_capture.sh"
 echo ""
 echo "Option 3: Adjust Settings Live"
-echo "  v4l2-ctl -d /dev/v4l-subdev6 --set-ctrl exposure=1800"
-echo "  v4l2-ctl -d /dev/v4l-subdev6 --set-ctrl analogue_gain=10"
+echo "  v4l2-ctl -d $SUBDEV --set-ctrl exposure=1800"
+echo "  v4l2-ctl -d $SUBDEV --set-ctrl analogue_gain=10"
 echo ""
 echo "========================================"
 echo ""

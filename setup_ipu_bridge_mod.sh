@@ -1,172 +1,91 @@
 #!/bin/bash
-# Download kernel source and prepare ipu_bridge modification
+# Fetch the Ubuntu kernel's ipu-bridge.c, add GC2607 (GCTI2607) support, and
+# stage it locally for building. Targets Ubuntu 24.04.4 LTS.
+#
+# The stock Ubuntu ipu-bridge module does NOT list GCTI2607, so the bridge must
+# be rebuilt with an extra IPU_SENSOR_CONFIG entry. We build just that one
+# module out-of-tree against the installed kernel headers, so we only need the
+# matching ipu-bridge.c source file (fetched via `apt-get source`).
 
-set -e  # Exit on error
+set -e
 
-KERNEL_VER="6.17.9"
-KERNEL_DIR="$HOME/kernel/dev"
-KERNEL_SRC="$KERNEL_DIR/linux-$KERNEL_VER"
-IPU_BRIDGE_FILE=""
+KERNEL_VER="$(uname -r)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+KERNEL_SRC="${KERNEL_SRC:-$SCRIPT_DIR/kernel-src}"
+STAGED_SRC="$KERNEL_SRC/ipu-bridge.c"
 
 echo "==========================================="
-echo "IPU Bridge Modification Setup"
+echo "IPU Bridge Modification Setup (Ubuntu)"
 echo "==========================================="
-echo ""
-echo "This script will:"
-echo "  1. Create ~/kernel/dev directory"
-echo "  2. Download Linux kernel $KERNEL_VER source"
-echo "  3. Extract the source"
-echo "  4. Locate ipu-bridge.c"
-echo "  5. Show what needs to be modified"
+echo "Running kernel: $KERNEL_VER"
+echo "Staging dir:    $KERNEL_SRC"
 echo ""
 
-# Step 1: Create directory
-echo "Step 1: Creating directory structure..."
-echo "---------------------------------------"
-mkdir -p "$KERNEL_DIR"
-cd "$KERNEL_DIR"
-echo "✅ Created: $KERNEL_DIR"
-echo ""
-
-# Step 2: Download kernel source
-echo "Step 2: Downloading kernel source..."
-echo "---------------------------------------"
-KERNEL_TAR="linux-$KERNEL_VER.tar.xz"
-KERNEL_URL="https://cdn.kernel.org/pub/linux/kernel/v6.x/$KERNEL_TAR"
-
-if [ -f "$KERNEL_TAR" ]; then
-    echo "⚠️  $KERNEL_TAR already exists, skipping download"
-else
-    echo "Downloading from: $KERNEL_URL"
-    wget "$KERNEL_URL" || {
-        echo "❌ Download failed. Trying alternative mirror..."
-        wget "https://kernel.org/pub/linux/kernel/v6.x/$KERNEL_TAR"
-    }
-    echo "✅ Downloaded: $KERNEL_TAR"
-fi
-echo ""
-
-# Step 3: Extract
-echo "Step 3: Extracting kernel source..."
-echo "---------------------------------------"
-if [ -d "$KERNEL_SRC" ]; then
-    echo "⚠️  $KERNEL_SRC already exists"
-    echo "Remove it? (y/N)"
-    read -n 1 REMOVE
+# Step 0: kernel headers (needed later to build the module)
+if [ ! -d "/lib/modules/$KERNEL_VER/build" ]; then
+    echo "⚠️  Kernel headers for $KERNEL_VER are not installed."
+    echo "   Run ./install_prereqs_ubuntu.sh first (it installs linux-headers-$KERNEL_VER)."
     echo ""
-    if [[ $REMOVE =~ ^[Yy]$ ]]; then
-        rm -rf "$KERNEL_SRC"
-        echo "Extracting..."
-        tar -xf "$KERNEL_TAR"
-        echo "✅ Extracted to: $KERNEL_SRC"
-    else
-        echo "Keeping existing directory"
+fi
+
+mkdir -p "$KERNEL_SRC"
+
+# Step 1: obtain ipu-bridge.c matching the running kernel
+echo "Step 1: Fetching ipu-bridge.c source..."
+echo "---------------------------------------"
+if [ -f "$STAGED_SRC" ]; then
+    echo "✅ Source already staged at $STAGED_SRC (delete it to refetch)."
+else
+    # `apt-get source` needs deb-src enabled. The Ubuntu 24.04 sources are in
+    # the deb822 file /etc/apt/sources.list.d/ubuntu.sources.
+    if ! apt-get source --download-only "linux-image-unsigned-$KERNEL_VER" 2>/dev/null; then
+        echo "⚠️  'apt-get source' failed. Enable source packages first, e.g.:"
+        echo "    sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources"
+        echo "    sudo apt-get update"
+        echo "   Then re-run this script. Fetching the source as your user:"
+        echo "    cd $KERNEL_SRC && apt-get source linux-image-unsigned-$KERNEL_VER"
+        echo ""
+        echo "   Alternatively set KERNEL_SRC to a tree that already contains"
+        echo "   drivers/media/pci/intel/ipu-bridge.c and re-run."
+        exit 1
     fi
-else
-    echo "Extracting..."
-    tar -xf "$KERNEL_TAR"
-    echo "✅ Extracted to: $KERNEL_SRC"
+    cd "$KERNEL_SRC"
+    apt-get source "linux-image-unsigned-$KERNEL_VER"
+    FOUND=$(find "$KERNEL_SRC" -path '*/drivers/media/pci/intel/ipu-bridge.c' | head -1)
+    if [ -z "$FOUND" ]; then
+        echo "❌ Could not locate ipu-bridge.c in the fetched source."
+        exit 1
+    fi
+    cp "$FOUND" "$STAGED_SRC"
+    echo "✅ Staged source: $STAGED_SRC"
 fi
 echo ""
 
-# Step 4: Find ipu-bridge.c
-echo "Step 4: Locating ipu-bridge.c..."
+# Step 2: add the GC2607 entry (idempotent)
+echo "Step 2: Adding GC2607 (GCTI2607) sensor entry..."
 echo "---------------------------------------"
-cd "$KERNEL_SRC"
-IPU_BRIDGE_FILE=$(find . -name "*ipu*bridge*.c" -o -name "ipu-bridge.c" | head -1)
-
-if [ -n "$IPU_BRIDGE_FILE" ]; then
-    echo "✅ Found: $IPU_BRIDGE_FILE"
-    IPU_BRIDGE_PATH="$KERNEL_SRC/$IPU_BRIDGE_FILE"
+if grep -q "GCTI2607" "$STAGED_SRC"; then
+    echo "✅ GCTI2607 entry already present."
 else
-    echo "❌ Could not find ipu-bridge.c"
-    echo "Searching more broadly..."
-    find . -path "*/intel/*" -name "*.c" | grep -i bridge
-    exit 1
+    # Insert our entry as the first element of the IPU_SENSOR_CONFIG array, by
+    # prepending it ahead of the first existing IPU_SENSOR_CONFIG() occurrence.
+    sed -i '0,/IPU_SENSOR_CONFIG(/s//\t\/* GalaxyCore GC2607 *\/\n\tIPU_SENSOR_CONFIG("GCTI2607", 1, 336000000),\n\tIPU_SENSOR_CONFIG(/' "$STAGED_SRC"
+    if grep -q "GCTI2607" "$STAGED_SRC"; then
+        echo "✅ GCTI2607 entry added."
+    else
+        echo "❌ Failed to add entry automatically. Add this line to the"
+        echo "   IPU_SENSOR_CONFIG table in $STAGED_SRC manually:"
+        echo '     IPU_SENSOR_CONFIG("GCTI2607", 1, 336000000),'
+        exit 1
+    fi
 fi
 echo ""
 
-# Step 5: Analyze the file
-echo "Step 5: Analyzing ipu-bridge.c..."
-echo "---------------------------------------"
-echo "File location: $IPU_BRIDGE_PATH"
-echo ""
-echo "Looking for sensor configuration array..."
-echo ""
-
-# Find the sensor config array
-if grep -n "IPU_SENSOR_CONFIG\|sensor.*config\|supported.*sensor" "$IPU_BRIDGE_PATH" | head -20; then
-    echo ""
-    echo "✅ Found sensor configuration section"
-else
-    echo "⚠️  Could not find sensor config array automatically"
-fi
-echo ""
-
-# Step 6: Show what needs to be added
-echo "Step 6: Modification Instructions"
 echo "==========================================="
-echo ""
-echo "📝 What to add to ipu-bridge.c:"
-echo ""
-echo "Find the sensor configuration array (look for lines like):"
-echo '  IPU_SENSOR_CONFIG("OVTI01A0", ...'
-echo '  IPU_SENSOR_CONFIG("OVTI8856", ...'
-echo ""
-echo "Add this line to the array:"
-echo '  IPU_SENSOR_CONFIG("GCTI2607", 1, 336000000),'
-echo ""
-echo "Details:"
-echo '  - "GCTI2607" = ACPI HID for GC2607 sensor'
-echo "  - 1 = number of link frequencies"
-echo "  - 336000000 = link frequency in Hz (336 MHz)"
-echo ""
+echo "Setup complete."
 echo "==========================================="
+echo "Patched source: $STAGED_SRC"
 echo ""
-
-# Step 7: Create a backup and show next steps
-echo "Step 7: Next Steps"
-echo "==========================================="
-echo ""
-echo "Ready to modify the file!"
-echo ""
-echo "Option A - Manual Edit:"
-echo "  1. Open file: $IPU_BRIDGE_PATH"
-echo "  2. Find sensor config array"
-echo "  3. Add GC2607 entry"
-echo "  4. Save and close"
-echo ""
-echo "Option B - Automated Patch:"
-echo "  Run: ./patch_ipu_bridge.sh"
-echo "  (Will be created next)"
-echo ""
-echo "After modification:"
-echo "  1. Recompile ipu_bridge module"
-echo "  2. Install new module"
-echo "  3. Reload and test"
-echo ""
-
-# Offer to show the exact location
-echo "Would you like to see the sensor array now? (y/N)"
-read -t 10 -n 1 SHOW
-echo ""
-if [[ $SHOW =~ ^[Yy]$ ]]; then
-    echo ""
-    echo "=== Sensor Configuration Array ==="
-    echo ""
-    grep -B 5 -A 20 "IPU_SENSOR_CONFIG" "$IPU_BRIDGE_PATH" | head -40
-    echo ""
-fi
-
-echo "==========================================="
-echo "Setup Complete!"
-echo "==========================================="
-echo ""
-echo "Kernel source ready at:"
-echo "  $KERNEL_SRC"
-echo ""
-echo "IPU bridge file:"
-echo "  $IPU_BRIDGE_PATH"
-echo ""
-echo "Next: Modify the file and recompile module"
+echo "Next: build + install the module:"
+echo "  ./compile_ipu_bridge_simple.sh"
 echo ""

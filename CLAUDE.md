@@ -177,19 +177,25 @@ sudo ./investigate_ipu_bridge.sh
 **Status:** Fully working - Camera integrated with IPU6
 
 **What Was Completed:**
-1. ✅ Downloaded Linux kernel 6.17.9 source to ~/kernel/dev
+1. ✅ Fetched the matching `ipu-bridge.c` (on Ubuntu via `apt-get source`; staged under `./kernel-src/`)
 2. ✅ Modified `drivers/media/pci/intel/ipu-bridge.c` to add GC2607 support
-3. ✅ Successfully compiled modified ipu_bridge module (511KB)
+3. ✅ Successfully compiled modified ipu_bridge module out-of-tree against the installed headers
 4. ✅ Installed modified module with GC2607 (GCTI2607) support
 5. ✅ Camera detected by IPU6 bridge
 6. ✅ Media pipeline established and working
 
 **Modification Made:**
-Added to `/home/abbood/kernel/dev/linux-6.17.9/drivers/media/pci/intel/ipu-bridge.c` at line 52:
+Added the following entry to the `IPU_SENSOR_CONFIG` table in
+`drivers/media/pci/intel/ipu-bridge.c` (done automatically by
+`setup_ipu_bridge_mod.sh`):
 ```c
 /* GalaxyCore GC2607 */
 IPU_SENSOR_CONFIG("GCTI2607", 1, 336000000),
 ```
+
+**Note (Ubuntu):** The stock Ubuntu `ipu-bridge.ko` does NOT contain `GCTI2607`,
+so this rebuild is required. The bridge is per-kernel — re-run the setup +
+compile scripts after a kernel update.
 
 **Files Created:**
 - `setup_ipu_bridge_mod.sh` - Downloads kernel source and prepares for modification
@@ -462,10 +468,32 @@ The camera is production-ready with exposure/gain controls and white balance! Po
 
 ## Quick Start Guide
 
+**Environment:** Ubuntu 24.04.4 LTS (kernel `6.17.0-1024-oem`). Scripts use
+`uname -r`, so they also work on the 24.04 GA/HWE kernels.
+
+**Install prerequisites (once):**
+```bash
+sudo ./install_prereqs_ubuntu.sh   # build tools, matching headers, v4l/gstreamer/python deps
+```
+
+**Patch + build the IPU6 bridge (once per kernel):**
+```bash
+./setup_ipu_bridge_mod.sh          # fetch ipu-bridge.c via apt source, add GCTI2607
+./compile_ipu_bridge_simple.sh     # build + install the patched bridge
+# then reboot
+```
+
 **Build the driver:**
 ```bash
 make
 ```
+
+**Device nodes (Ubuntu):** The camera's V4L2 nodes are not fixed —
+`v4l2loopback` (auto-loaded at boot) often claims `/dev/video0`, so the real
+IPU6 capture node is usually `/dev/video1`, and the sensor subdev index varies
+by probe order. The workflow scripts source `camera_env.sh`, which resolves
+`MEDIA_DEV` / `CAM_DEV` / `SUBDEV` from the media graph via `media-ctl -e`.
+Do not hardcode `/dev/video0` / `/dev/v4l-subdev6`.
 
 **Load modules and capture an image:**
 ```bash
@@ -518,6 +546,7 @@ sudo ./init_camera.sh
 - Media controller documentation: https://www.kernel.org/doc/html/latest/userspace-api/media/mediactl/media-controller.html
 
 **Project Status:** ✅ PRODUCTION READY - Camera driver with natural colors and optimal exposure!
-**Last Updated:** January 7, 2026
-**Kernel Version:** 6.17.9-arch1-1
+**Last Updated:** June 15, 2026
+**Distro:** Ubuntu 24.04.4 LTS (originally developed on Arch Linux)
+**Kernel Version:** 6.17.0-1024-oem (Ubuntu OEM); scripts also build on 6.8/6.11/6.14
 **Achievement:** Successfully ported proprietary embedded camera driver to mainline Linux V4L2 with IPU6 integration, implemented full exposure/gain controls, and gray world white balance for production-quality video streaming in OBS Studio, Google Meet, and Chrome

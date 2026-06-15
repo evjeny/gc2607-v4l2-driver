@@ -1,15 +1,18 @@
 #!/bin/bash
-# Properly compile ipu_bridge against Arch kernel headers
+# Properly compile ipu_bridge against the installed kernel headers
 
 set -e
 
-KERNEL_VER="6.17.9-arch1-1"
+# NOTE: This variant expects the kernel build tree to ship ipu-bridge.c, which
+# Ubuntu's linux-headers packages do NOT include. Prefer setup_ipu_bridge_mod.sh
+# (fetches source via apt) + compile_ipu_bridge_simple.sh on Ubuntu.
+KERNEL_VER="$(uname -r)"
 KERNEL_BUILD="/lib/modules/$KERNEL_VER/build"
 MODULE_SRC="$KERNEL_BUILD/drivers/media/pci/intel"
 MODULE_NAME="ipu-bridge"
 
 echo "==========================================="
-echo "IPU Bridge Fix - Compile Against Arch Kernel"
+echo "IPU Bridge Fix - Compile Against Installed Kernel Headers"
 echo "==========================================="
 echo ""
 
@@ -19,7 +22,7 @@ if [ ! -d "$KERNEL_BUILD" ]; then
     exit 1
 fi
 
-echo "✅ Using Arch kernel headers: $KERNEL_BUILD"
+echo "✅ Using kernel headers: $KERNEL_BUILD"
 echo ""
 
 # Step 1: Modify ipu-bridge.c in kernel headers tree

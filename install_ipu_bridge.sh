@@ -3,8 +3,10 @@
 
 set -e
 
-KERNEL_VER="6.17.9-arch1-1"
-NEW_MODULE="/home/abbood/kernel/dev/linux-6.17.9/drivers/media/pci/intel/ipu-bridge.ko"
+KERNEL_VER="$(uname -r)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Path to a freshly built ipu-bridge.ko (override with NEW_MODULE=... if needed).
+NEW_MODULE="${NEW_MODULE:-$SCRIPT_DIR/ipu-bridge.ko}"
 SYSTEM_MODULE="/lib/modules/$KERNEL_VER/kernel/drivers/media/pci/intel/ipu-bridge.ko.zst"
 
 echo "==========================================="

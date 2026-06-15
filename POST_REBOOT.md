@@ -3,7 +3,7 @@
 ## First Time Setup (One Time Only)
 
 ```bash
-cd /home/abbood/dev/camera-driver-dev/gc2607-v4l2-driver
+cd /home/evgeny/workspace/gc2607-v4l2-driver
 sudo ./setup_permissions.sh
 ```
 
@@ -12,7 +12,7 @@ sudo ./setup_permissions.sh
 ## After Every Reboot
 
 ```bash
-cd /home/abbood/dev/camera-driver-dev/gc2607-v4l2-driver
+cd /home/evgeny/workspace/gc2607-v4l2-driver
 ./claude.init
 ```
 

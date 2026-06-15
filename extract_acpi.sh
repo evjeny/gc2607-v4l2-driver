@@ -27,7 +27,7 @@ if [ -f dsdt.dat ]; then
     fi
 else
     echo "ERROR: dsdt.dat not found. Do you have acpica-tools installed?"
-    echo "Install with: sudo pacman -S acpica"
+    echo "Install with: sudo apt install acpica-tools"
 fi
 
 cd - > /dev/null

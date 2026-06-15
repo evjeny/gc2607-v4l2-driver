@@ -115,7 +115,7 @@ Extract ACPI tables to see GPIO resource declarations:
 
 ```bash
 # Install ACPI tools (if not installed)
-sudo pacman -S acpica
+sudo apt install acpica-tools
 
 # Extract and decompile DSDT
 sudo acpidump -b

@@ -49,7 +49,7 @@ modprobe intel_ipu6_psys 2>/dev/null || echo "  (psys optional, skipping)"
 echo ""
 echo "Step 3: Loading GC2607 driver..."
 echo "---------------------------------------"
-cd /home/abbood/dev/camera-driver-dev/gc2607-v4l2-driver
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 insmod gc2607.ko
 echo "✅ gc2607 loaded"
 echo ""

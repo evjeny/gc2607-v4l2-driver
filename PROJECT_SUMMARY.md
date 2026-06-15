@@ -353,7 +353,7 @@ When continuing this project:
 - GalaxyCore GC2607 register documentation
 
 **Tools Used:**
-- Linux kernel 6.17.9-arch1-1
+- Ubuntu 24.04.4 LTS, Linux kernel 6.17.0-1024-oem (originally developed on Arch 6.17.9-arch1-1)
 - v4l2-ctl, media-ctl (v4l-utils)
 - gcc kernel module compiler
 - dmesg, modinfo diagnostics

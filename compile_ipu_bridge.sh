@@ -3,8 +3,12 @@
 
 set -e  # Exit on error
 
-KERNEL_VER="6.17.9-arch1-1"
-KERNEL_SRC="$HOME/kernel/dev/linux-6.17.9"
+# NOTE: For Ubuntu the lighter out-of-tree build in compile_ipu_bridge_simple.sh
+# is recommended. This script does a full in-tree module build and needs a
+# complete, configured kernel source tree at $KERNEL_SRC.
+KERNEL_VER="$(uname -r)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+KERNEL_SRC="${KERNEL_SRC:-$SCRIPT_DIR/kernel-src}"
 MODULE_NAME="ipu-bridge"
 MODULE_PATH="drivers/media/pci/intel"
 

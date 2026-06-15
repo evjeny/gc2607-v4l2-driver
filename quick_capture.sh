@@ -6,18 +6,16 @@ set -e
 echo "=== Quick Capture Test ==="
 echo ""
 
-# Check if camera is initialized
-if [ ! -e /dev/v4l-subdev6 ]; then
-    echo "Error: Camera not initialized. Run: sudo ./init_camera.sh"
-    exit 1
-fi
+# Resolve the actual camera/sensor nodes from the media graph.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/camera_env.sh"
 
+echo "Camera: $CAM_DEV   Sensor: $SUBDEV"
 echo "Current settings:"
-v4l2-ctl -d /dev/v4l-subdev6 --get-ctrl exposure,analogue_gain
+v4l2-ctl -d "$SUBDEV" --get-ctrl exposure,analogue_gain
 echo ""
 
 echo "Capturing image..."
-v4l2-ctl -d /dev/video0 --stream-mmap --stream-count=1 --stream-to=capture.raw
+v4l2-ctl -d "$CAM_DEV" --stream-mmap --stream-count=1 --stream-to=capture.raw
 
 echo "Converting to PNG (no brightness adjustment)..."
 ./view_raw_bright.py capture.raw 1.0

@@ -3,6 +3,10 @@
 
 set -e
 
+# Resolve the repo directory so the sudoers rule points at this checkout,
+# wherever it lives, instead of a hardcoded path.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 echo "=== Setting Up Permissions ==="
 echo ""
 
@@ -16,16 +20,16 @@ SUDOERS_FILE="/etc/sudoers.d/gc2607-camera"
 echo "2. Creating sudoers configuration..."
 sudo tee "$SUDOERS_FILE" > /dev/null <<EOF
 # Allow $USER to manage camera driver without password
-$USER ALL=(ALL) NOPASSWD: /usr/bin/insmod /home/abbood/dev/camera-driver-dev/gc2607-v4l2-driver/gc2607.ko
-$USER ALL=(ALL) NOPASSWD: /usr/bin/rmmod gc2607
-$USER ALL=(ALL) NOPASSWD: /usr/bin/modprobe videodev
-$USER ALL=(ALL) NOPASSWD: /usr/bin/modprobe v4l2-async
-$USER ALL=(ALL) NOPASSWD: /usr/bin/modprobe ipu_bridge
-$USER ALL=(ALL) NOPASSWD: /usr/bin/modprobe intel-ipu6
-$USER ALL=(ALL) NOPASSWD: /usr/bin/modprobe intel-ipu6-isys
-$USER ALL=(ALL) NOPASSWD: /usr/bin/modprobe -r intel-ipu6-isys
-$USER ALL=(ALL) NOPASSWD: /usr/bin/modprobe -r intel-ipu6
-$USER ALL=(ALL) NOPASSWD: /usr/bin/modprobe v4l2loopback *
+$USER ALL=(ALL) NOPASSWD: /usr/sbin/insmod $SCRIPT_DIR/gc2607.ko
+$USER ALL=(ALL) NOPASSWD: /usr/sbin/rmmod gc2607
+$USER ALL=(ALL) NOPASSWD: /usr/sbin/modprobe videodev
+$USER ALL=(ALL) NOPASSWD: /usr/sbin/modprobe v4l2-async
+$USER ALL=(ALL) NOPASSWD: /usr/sbin/modprobe ipu_bridge
+$USER ALL=(ALL) NOPASSWD: /usr/sbin/modprobe intel-ipu6
+$USER ALL=(ALL) NOPASSWD: /usr/sbin/modprobe intel-ipu6-isys
+$USER ALL=(ALL) NOPASSWD: /usr/sbin/modprobe -r intel-ipu6-isys
+$USER ALL=(ALL) NOPASSWD: /usr/sbin/modprobe -r intel-ipu6
+$USER ALL=(ALL) NOPASSWD: /usr/sbin/modprobe v4l2loopback *
 $USER ALL=(ALL) NOPASSWD: /usr/bin/dmesg
 EOF
 

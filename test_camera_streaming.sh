@@ -64,7 +64,7 @@ if command -v v4l2-ctl &> /dev/null; then
     v4l2-ctl --list-subdevs | grep -i gc2607 || echo "⚠️  GC2607 not found in subdev list"
 else
     echo "⚠️  v4l2-ctl not installed"
-    echo "   Install with: sudo pacman -S v4l-utils"
+    echo "   Install with: sudo apt install v4l-utils"
 fi
 echo ""
 
@@ -82,7 +82,7 @@ if command -v media-ctl &> /dev/null; then
     media-ctl --print-topology 2>/dev/null | grep -A 5 -i gc2607 || echo "⚠️  GC2607 not in media topology"
 else
     echo "⚠️  media-ctl not installed"
-    echo "   Install with: sudo pacman -S v4l-utils"
+    echo "   Install with: sudo apt install v4l-utils"
 fi
 echo ""
 

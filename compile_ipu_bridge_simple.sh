@@ -3,9 +3,11 @@
 
 set -e
 
-KERNEL_VER="6.17.9-arch1-1"
-KERNEL_SRC="$HOME/kernel/dev/linux-6.17.9"
-SOURCE_FILE="$KERNEL_SRC/drivers/media/pci/intel/ipu-bridge.c"
+KERNEL_VER="$(uname -r)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+KERNEL_SRC="${KERNEL_SRC:-$SCRIPT_DIR/kernel-src}"
+# The staged, GCTI2607-patched source produced by setup_ipu_bridge_mod.sh.
+SOURCE_FILE="${SOURCE_FILE:-$KERNEL_SRC/ipu-bridge.c}"
 
 echo "==========================================="
 echo "IPU Bridge - Single Module Build"

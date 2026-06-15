@@ -45,35 +45,50 @@ This driver successfully ports the GC2607 sensor from embedded platforms to main
 
 ## Prerequisites
 
-### Required Packages (Arch Linux)
+Tested on **Ubuntu 24.04.4 LTS** (kernel `6.17.0-1024-oem`). The scripts detect
+the running kernel with `uname -r`, so they also work on the 24.04 GA/HWE
+kernels (6.8 / 6.11 / 6.14).
+
+### Required Packages (Ubuntu)
+
+Install everything in one step:
 
 ```bash
-# Core driver dependencies
-sudo pacman -S base-devel linux-headers v4l-utils media-ctl python-pillow python-numpy feh
-
-# For OBS Studio integration (optional)
-sudo pacman -S v4l2loopback-dkms gstreamer gst-plugins-base gst-plugins-good
+sudo ./install_prereqs_ubuntu.sh
 ```
+
+This installs `build-essential`, the matching `linux-headers-$(uname -r)`,
+`v4l-utils`, `i2c-tools`, GStreamer + `frei0r-plugins`, `v4l2loopback-dkms`,
+`python3-numpy`, `python3-pil`, `feh`, `bc`, `acpica-tools`, and `zstd`.
 
 ### Modified IPU6 Bridge Module
 
-**Important:** This driver requires a modified `ipu_bridge` kernel module that recognizes the GC2607 sensor.
+**Important:** This driver requires a modified `ipu_bridge` kernel module that
+recognizes the GC2607 sensor. The stock Ubuntu `ipu-bridge` module does **not**
+list `GCTI2607`, so it must be rebuilt with an extra sensor entry.
 
 #### Installation
 
 ```bash
-# 1. Run the setup script to download kernel source
+# 1. Fetch the matching ipu-bridge.c (via apt source) and add GCTI2607 support.
+#    Requires source packages (deb-src). If apt source fails, enable it with:
+#      sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
+#      sudo apt-get update
 ./setup_ipu_bridge_mod.sh
 
-# 2. Compile the modified bridge module
+# 2. Build the patched bridge against your installed headers and install it.
 ./compile_ipu_bridge_simple.sh
 
-# The script will automatically:
-# - Add GCTI2607 support to ipu-bridge.c
-# - Compile against your running kernel
-# - Install the modified module
-# - Create a backup of the original
+# The scripts will automatically:
+# - Add GCTI2607 support to a staged copy of ipu-bridge.c
+# - Compile against /lib/modules/$(uname -r)/build
+# - Install the zstd-compressed module (backing up the original)
+# - Run depmod
+
+# 3. Reboot so the patched bridge loads cleanly (the IPU6 modules are in use).
 ```
+
+> **Note:** The bridge is per-kernel. After a kernel update, re-run steps 1–3.
 
 ## Building the Driver
 
@@ -82,6 +97,20 @@ make
 ```
 
 ## Usage
+
+### Device nodes are detected at runtime
+
+The camera's V4L2 nodes are **not fixed**. On Ubuntu, `v4l2loopback` (auto-loaded
+at boot) commonly claims `/dev/video0`, pushing the real IPU6 capture node to
+`/dev/video1`; the sensor subdev index also depends on probe order. Instead of
+hardcoding, the scripts source **`camera_env.sh`**, which resolves them from the
+media graph and exports:
+
+- `MEDIA_DEV` — the IPU6 media device (e.g. `/dev/media0`)
+- `CAM_DEV` — the IPU6 capture node (e.g. `/dev/video1`)
+- `SUBDEV` — the gc2607 sensor subdev (e.g. `/dev/v4l-subdev6`)
+
+You can use it interactively too: `source ./camera_env.sh && echo "$CAM_DEV $SUBDEV"`.
 
 ### Quick Start - Capture Your First Image
 
@@ -96,18 +125,18 @@ sudo modprobe intel-ipu6-isys
 # 2. Load the GC2607 driver
 sudo insmod gc2607.ko
 
-# 3. Verify the sensor is detected
-media-ctl -d /dev/media0 --print-topology | grep gc2607
-# You should see: - entity 349: gc2607 5-0037 (...)
+# 3. Resolve the camera nodes (and verify the sensor is detected)
+source ./camera_env.sh
+echo "camera=$CAM_DEV sensor=$SUBDEV"   # e.g. camera=/dev/video1 sensor=/dev/v4l-subdev6
 
 # 4. Configure the video device format
-v4l2-ctl -d /dev/video0 --set-fmt-video=width=1920,height=1080,pixelformat=BA10
+v4l2-ctl -d "$CAM_DEV" --set-fmt-video=width=1920,height=1080,pixelformat=BA10
 
 # 5. Enable the media pipeline link
-media-ctl -d /dev/media0 -l '"Intel IPU6 CSI2 0":1 -> "Intel IPU6 ISYS Capture 0":0[1]'
+media-ctl -d "$MEDIA_DEV" -l '"Intel IPU6 CSI2 0":1 -> "Intel IPU6 ISYS Capture 0":0[1]'
 
 # 6. Capture an image
-v4l2-ctl -d /dev/video0 --stream-mmap --stream-count=1 --stream-to=capture.raw
+v4l2-ctl -d "$CAM_DEV" --stream-mmap --stream-count=1 --stream-to=capture.raw
 
 # 7. Convert RAW to viewable PNG (with brightness boost)
 ./view_raw_bright.py capture.raw 5.0
@@ -115,6 +144,9 @@ v4l2-ctl -d /dev/video0 --stream-mmap --stream-count=1 --stream-to=capture.raw
 # 8. View the image
 feh capture.png
 ```
+
+> **Tip:** `./claude.init` (or `sudo ./init_camera.sh`) does steps 1–5
+> automatically using `camera_env.sh`.
 
 ### Automated Capture Script
 
@@ -303,6 +335,8 @@ The camera should now appear as "GC2607 RGB Camera" in the device list.
 
 - **gc2607.c** - Main driver (V4L2 subdev, power management, register initialization)
 - **ipu-bridge.c** - Modified to recognize GCTI2607 sensor
+- **camera_env.sh** - Resolves the camera/sensor V4L2 nodes at runtime (sourced by the workflow scripts)
+- **install_prereqs_ubuntu.sh** - One-shot apt installer for all prerequisites (Ubuntu)
 - **view_raw_bright.py** - RAW Bayer to PNG converter with brightness boost
 - **view_raw_wb.py** - RAW Bayer to PNG converter with gray world white balance
 - **calculate_wb_gains.py** - Calculate optimal white balance gains from raw capture
@@ -396,7 +430,7 @@ Contributions welcome! Areas of interest:
 ---
 
 **Status:** ✅ Production ready - Full exposure/gain control, OBS Studio & Google Meet compatible
-**Tested on:** Huawei MateBook Pro VGHH-XX
-**Kernel:** 6.17.9-arch1-1
-**Last Updated:** January 7, 2026
+**Tested on:** Huawei MateBook Pro VGHH-XX, Ubuntu 24.04.4 LTS
+**Kernel:** 6.17.0-1024-oem (Ubuntu OEM); also builds on 6.8/6.11/6.14
+**Last Updated:** June 15, 2026
 **Achievement:** Successfully ported proprietary embedded camera driver to mainline Linux V4L2 with IPU6 integration, full manual controls, real-time video streaming, and WebRTC compatibility

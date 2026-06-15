@@ -1,1 +1,1 @@
-savedcmd_Module.symvers :=  /usr/lib/modules/6.17.9-arch1-1/build/scripts/mod/modpost -M    -a    -N  -o Module.symvers -n -T modules.order -i /usr/lib/modules/6.17.9-arch1-1/build/Module.symvers -e 
+savedcmd_Module.symvers :=  /usr/src/linux-headers-6.17.0-1024-oem/scripts/mod/modpost -M -m -b -x -a      -o Module.symvers -T modules.order -i /usr/src/linux-headers-6.17.0-1024-oem/Module.symvers -e 
