@@ -16,7 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Phase 7: Exposure, Gain & White Balance ✅ COMPLETE:**
 - ✅ Exposure control (V4L2_CID_EXPOSURE) - range 4-2002
 - ✅ Gain control (V4L2_CID_ANALOGUE_GAIN) - LUT index 0-16
-- ✅ Gray world white balance (R=1.034, G=1.000, B=1.246)
+- ✅ Gray world white balance (R=1.414, G=1.000, B=1.283)
 - ✅ Optimal settings for indoor lighting: exposure=2002, gain=16
 - ✅ Real-time white balance in GStreamer pipeline using frei0r
 
@@ -274,7 +274,7 @@ feh capture.png
 
 3. ✅ **Gray World White Balance**
    - Implemented in GStreamer pipeline using `frei0r-filter-coloradj-rgb`
-   - Calculated gains: R=1.034, G=1.000, B=1.246
+   - Calculated gains: R=1.414, G=1.000, B=1.283
    - Applied during Bayer-to-RGB conversion in userspace
    - Sensor has no hardware white balance registers
 
@@ -293,7 +293,7 @@ v4l2-ctl -d /dev/v4l-subdev6 --set-ctrl exposure=2002
 # Gain: Maximum LUT index (16 = 15.8x gain)
 v4l2-ctl -d /dev/v4l-subdev6 --set-ctrl analogue_gain=16
 
-# White balance: Applied in GStreamer (R=1.034, G=1.000, B=1.246)
+# White balance: Applied in GStreamer (R=1.414, G=1.000, B=1.283)
 ```
 
 **Key Discoveries:**
@@ -308,7 +308,7 @@ v4l2-ctl -d /dev/v4l-subdev6 --set-ctrl analogue_gain=16
 - Gain uses lookup table with 17 entries (index 0-16)
 - Exposure range validated: 4-2002 lines (VTS-2)
 - GStreamer pipeline uses frei0r RGB color adjustment filter
-- White balance parameters: r=0.517, g=0.500, b=0.623 (frei0r scale)
+- White balance parameters: r=0.707, g=0.500, b=0.641 (frei0r scale)
 
 **Achievements:**
 - ✅ Natural color reproduction without green tint

@@ -252,17 +252,18 @@ v4l2-ctl -d /dev/v4l-subdev6 --set-ctrl exposure=2002,analogue_gain=16
 
 ### White Balance
 
-All camera scripts automatically apply **gray world white balance** during Bayer-to-RGB conversion using GStreamer's `frei0r-filter-coloradj-rgb`:
+All camera scripts apply **gray world white balance** during Bayer-to-RGB conversion using GStreamer's `frei0r-filter-coloradj-rgb`. The gains are baked into `gc2607-stream.sh` (green dominates the raw Bayer stream, so red/blue are boosted):
 
-- **Red gain:** 1.034
+- **Red gain:** 1.414
 - **Green gain:** 1.000 (reference)
-- **Blue gain:** 1.246
+- **Blue gain:** 1.283
 
-These values are calibrated for natural color reproduction. To recalibrate for your lighting conditions:
+Override them per-run via env (`R_GAIN=… B_GAIN=… ./create_virtual_camera.sh`) or by passing args to `./create_virtual_camera_wb.sh <r> <g> <b>`. To recalibrate for your lighting conditions:
 
 ```bash
-# Capture a test frame
-v4l2-ctl -d /dev/video0 --stream-mmap --stream-count=1 --stream-to=wb_test.raw
+# Capture a test frame (CAM_DEV resolved by camera_env.sh, e.g. /dev/video1)
+source ./camera_env.sh
+v4l2-ctl -d "$CAM_DEV" --stream-mmap --stream-count=1 --stream-to=wb_test.raw
 
 # Calculate optimal white balance gains
 ./calculate_wb_gains.py wb_test.raw
@@ -270,6 +271,30 @@ v4l2-ctl -d /dev/video0 --stream-mmap --stream-count=1 --stream-to=wb_test.raw
 # Use the calculated gains with the WB script
 ./create_virtual_camera_wb.sh <R_GAIN> <G_GAIN> <B_GAIN>
 ```
+
+## Start the Virtual Camera Automatically at Boot
+
+Install the systemd service so "GC2607 Camera" is available right after login —
+no manual scripts needed:
+
+```bash
+sudo ./install_service.sh
+```
+
+This masks `v4l2-relayd`, installs `gc2607-camera.service` (which runs
+`gc2607-stream.sh`: load driver → configure pipeline → reset v4l2loopback →
+stream RGB+WB), and enables it at boot. Manage it with:
+
+```bash
+sudo systemctl status gc2607-camera        # check
+sudo systemctl restart gc2607-camera       # restart
+sudo systemctl disable --now gc2607-camera # stop autostart
+journalctl -u gc2607-camera -b             # logs since boot
+```
+
+The service defaults to YUY2/30fps (OBS/Meet). For Chrome/Meet I420/24fps, edit
+`/etc/systemd/system/gc2607-camera.service` (`Environment=OUT_FORMAT=I420`,
+`Environment=FPS=24`), then `daemon-reload` + `restart`.
 
 ## Troubleshooting
 
@@ -349,6 +374,8 @@ The camera should now appear as "GC2607 RGB Camera" in the device list.
 - **gc2607.c** - Main driver (V4L2 subdev, power management, register initialization)
 - **ipu-bridge.c** - Modified to recognize GCTI2607 sensor
 - **camera_env.sh** - Resolves the camera/sensor V4L2 nodes at runtime (sourced by the workflow scripts)
+- **gc2607-stream.sh** - Single streaming daemon (driver + pipeline + v4l2loopback + RGB/WB feed); used by the wrappers and the systemd service
+- **install_service.sh** - Installs `gc2607-camera.service` to autostart the virtual camera at boot
 - **install_prereqs_ubuntu.sh** - One-shot apt installer for all prerequisites (Ubuntu)
 - **view_raw_bright.py** - RAW Bayer to PNG converter with brightness boost
 - **view_raw_wb.py** - RAW Bayer to PNG converter with gray world white balance
