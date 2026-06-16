@@ -36,7 +36,7 @@ pkill -f 'gst-launch.*v4l2sink' 2>/dev/null || true
 sleep 1
 
 source "$SCRIPT_DIR/camera_env.sh"
-v4l2-ctl -d "$SUBDEV" --set-ctrl exposure=2002,analogue_gain=16 2>/dev/null || true
+v4l2-ctl -d "$SUBDEV" --set-ctrl exposure=2000,analogue_gain=9 2>/dev/null || true
 v4l2-ctl -d "$CAM_DEV" --set-fmt-video=width=1920,height=1080,pixelformat=BA10 >/dev/null 2>&1 || true
 
 # WB stage: red channel (channel=0.0) then blue channel (channel=0.2).

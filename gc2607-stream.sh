@@ -22,8 +22,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUT_FORMAT="${OUT_FORMAT:-YUY2}"
 FPS="${FPS:-30}"
 CARD_LABEL="${CARD_LABEL:-GC2607 Camera}"
-EXPOSURE="${EXPOSURE:-2002}"
-GAIN="${GAIN:-16}"
+EXPOSURE="${EXPOSURE:-2000}"
+GAIN="${GAIN:-9}"
 
 # Hardcoded white-balance gains (tuned with tune_wb.sh until R/G=B/G=1.0 at the
 # pipeline output). Green dominates the raw Bayer stream, so red/blue are boosted
