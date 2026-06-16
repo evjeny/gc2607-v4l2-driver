@@ -2,6 +2,49 @@
 
 A fully functional Linux V4L2 driver for the GalaxyCore GC2607 camera sensor, integrated with Intel IPU6 on x86_64 systems.
 
+## ⚠️ AI NOTICE
+
+**This project — the kernel driver, shell scripts, and documentation — was written
+with heavy AI assistance and has NOT been independently audited.** It is **not**
+official and comes with **no warranty**.
+
+These scripts run as root: they load/unload kernel modules, rebuild and replace
+the in-tree `ipu-bridge` module, change `v4l2loopback`, and enable a systemd
+service. **Running them can crash or fail to boot your system, cause data loss,
+or — in the worst case — damage hardware.** Read each script before running it
+and proceed entirely at your own risk.
+
+## Quickstart
+
+Ubuntu 24.04.4 LTS. Run from the repo directory. Review the scripts first (see AI NOTICE above).
+
+```bash
+# 1. Install prerequisites (build tools, matching kernel headers, v4l/gstreamer, etc.)
+sudo ./install_prereqs_ubuntu.sh
+
+# 2. Patch + build the IPU6 bridge so it recognizes the GC2607 (once per kernel)
+#    (needs deb-src; the script prints how to enable it if missing)
+./setup_ipu_bridge_mod.sh
+./compile_ipu_bridge_simple.sh
+
+# 3. Build the sensor driver
+make
+
+# 4. Reboot so the patched bridge + driver load cleanly
+sudo reboot
+
+# 5. After reboot: autostart the virtual camera at every boot
+sudo ./install_service.sh
+```
+
+Then pick **"aGC2607"** as your camera in OBS / Meet / Zoom. That's it.
+
+- Adjust brightness: `./tune_exposure.sh <exposure> <gain>` (live)
+- Adjust colors: `./tune_wb.sh --measure <red_gain> <blue_gain>`
+- Service control: `sudo systemctl {status,restart} gc2607-camera`
+
+More detail (manual capture, troubleshooting, internals) is below.
+
 ## Overview
 
 This driver successfully ports the GC2607 sensor from embedded platforms to mainline Linux, enabling camera functionality on laptops with Intel IPU6 that use this sensor.
@@ -181,7 +224,7 @@ sudo ./init_camera.sh
 
 Now in OBS Studio:
 1. Add Source → Video Capture Device (V4L2)
-2. Select device: **"GC2607 Camera"** from the dropdown
+2. Select device: **"aGC2607"** from the dropdown (the leading `a` makes it sort to the top, ahead of the IPU6 entries)
 3. The camera will appear with proper RGB colors and correct orientation
 
 **Note:** The `create_virtual_camera.sh` script must keep running while using the camera.
@@ -224,7 +267,7 @@ sudo systemctl mask --now v4l2-relayd
 Then in Google Meet:
 1. Join a meeting
 2. Click Settings (gear icon) → Video
-3. Select: **"GC2607 RGB Camera"** from the dropdown
+3. Select: **"aGC2607 RGB"** from the dropdown
 
 **Note:** Your external USB cameras (like Logitech) will still work perfectly with PipeWire disabled. Both cameras will appear in the list.
 
@@ -282,7 +325,7 @@ v4l2-ctl -d "$CAM_DEV" --stream-mmap --stream-count=1 --stream-to=wb_test.raw
 
 ## Start the Virtual Camera Automatically at Boot
 
-Install the systemd service so "GC2607 Camera" is available right after login —
+Install the systemd service so "aGC2607" is available right after login —
 no manual scripts needed:
 
 ```bash
@@ -360,7 +403,7 @@ v4l2-ctl -d /dev/video0 --set-fmt-video=width=1920,height=1080,pixelformat=BA10
 5. Run `./reload_for_chrome.sh` to restart the camera pipeline
 6. Refresh Google Meet
 
-The camera should now appear as "GC2607 RGB Camera" in the device list.
+The camera should now appear as "aGC2607 RGB" in the device list.
 
 ## Architecture
 

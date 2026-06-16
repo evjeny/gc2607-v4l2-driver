@@ -12,7 +12,8 @@
 # Tunables (environment variables):
 #   OUT_FORMAT   output pixel format for the loopback (default YUY2; I420 for Chrome)
 #   FPS          output frame rate (default 30)
-#   CARD_LABEL   v4l2loopback card label (default "GC2607 Camera")
+#   CARD_LABEL   v4l2loopback card label (default "aGC2607"; the leading 'a'
+#                sorts it ahead of the IPU6 entries in app camera lists)
 #   R_GAIN/G_GAIN/B_GAIN  white-balance gains (default: measured gray-world values)
 #   EXPOSURE/GAIN         sensor controls (default 2002 / 16)
 
@@ -21,7 +22,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 OUT_FORMAT="${OUT_FORMAT:-YUY2}"
 FPS="${FPS:-30}"
-CARD_LABEL="${CARD_LABEL:-GC2607 Camera}"
+CARD_LABEL="${CARD_LABEL:-aGC2607}"
 EXPOSURE="${EXPOSURE:-2000}"
 GAIN="${GAIN:-9}"
 

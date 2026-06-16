@@ -11,7 +11,7 @@ sudo systemctl stop v4l2-relayd 2>/dev/null || true
 sleep 1
 echo "Resetting v4l2loopback..."
 sudo modprobe -r v4l2loopback 2>&1 || { echo "modprobe -r failed (still in use)"; sudo fuser -v /dev/video0 2>&1; }
-sudo modprobe v4l2loopback devices=1 card_label="GC2607 Camera" exclusive_caps=1 max_buffers=2
+sudo modprobe v4l2loopback devices=1 card_label="aGC2607" exclusive_caps=1 max_buffers=2
 sleep 1
 
 VIRT=""

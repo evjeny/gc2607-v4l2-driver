@@ -28,7 +28,7 @@ Type=simple
 # Output format/fps for the virtual camera. Use I420 / 24 for Chrome/Meet.
 Environment=OUT_FORMAT=YUY2
 Environment=FPS=30
-Environment=CARD_LABEL=GC2607 Camera
+Environment=CARD_LABEL=aGC2607
 ExecStart=$SCRIPT_DIR/gc2607-stream.sh
 Restart=on-failure
 RestartSec=5
@@ -46,7 +46,7 @@ echo ""
 echo "=== Service status ==="
 sudo systemctl status --no-pager gc2607-camera.service | head -15 || true
 echo ""
-echo "✅ Installed. The virtual camera ('GC2607 Camera') starts at every boot."
+echo "✅ Installed. The virtual camera ('aGC2607') starts at every boot."
 echo ""
 echo "Manage it with:"
 echo "  sudo systemctl status gc2607-camera     # check"
