@@ -252,13 +252,21 @@ v4l2-ctl -d /dev/v4l-subdev6 --set-ctrl exposure=2002,analogue_gain=16
 
 ### White Balance
 
-All camera scripts apply **gray world white balance** during Bayer-to-RGB conversion using GStreamer's `frei0r-filter-coloradj-rgb`. The gains are baked into `gc2607-stream.sh` (green dominates the raw Bayer stream, so red/blue are boosted):
+White balance is applied during Bayer-to-RGB conversion using two per-channel `frei0r-filter-levels` stages (a real linear multiply; the older `coloradj-rgb` filter was too weak and left a green tint). Green dominates the raw Bayer stream, so red/blue are boosted. The gains are baked into `gc2607-stream.sh`:
 
-- **Red gain:** 1.414
+- **Red gain:** 1.77
 - **Green gain:** 1.000 (reference)
-- **Blue gain:** 1.283
+- **Blue gain:** 1.54
 
-Override them per-run via env (`R_GAIN=… B_GAIN=… ./create_virtual_camera.sh`) or by passing args to `./create_virtual_camera_wb.sh <r> <g> <b>`. To recalibrate for your lighting conditions:
+Override per-run via env (`R_GAIN=… B_GAIN=… ./create_virtual_camera.sh`). To re-tune for your lighting, use the interactive helper:
+
+```bash
+./tune_wb.sh --measure          # prints output R/G/B means at the current gains
+./tune_wb.sh --measure 1.8 1.5  # try red=1.8 blue=1.5; aim for R/G≈B/G≈1.00
+./tune_wb.sh 1.77 1.54          # live preview window
+```
+
+Then put the chosen `R_GAIN`/`B_GAIN` into `gc2607-stream.sh`. The legacy gray-world calculator still works for a starting point:
 
 ```bash
 # Capture a test frame (CAM_DEV resolved by camera_env.sh, e.g. /dev/video1)

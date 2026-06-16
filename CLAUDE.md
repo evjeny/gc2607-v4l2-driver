@@ -16,7 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Phase 7: Exposure, Gain & White Balance ✅ COMPLETE:**
 - ✅ Exposure control (V4L2_CID_EXPOSURE) - range 4-2002
 - ✅ Gain control (V4L2_CID_ANALOGUE_GAIN) - LUT index 0-16
-- ✅ Gray world white balance (R=1.414, G=1.000, B=1.283)
+- ✅ White balance via per-channel frei0r levels (R=1.77, G=1.000, B=1.54)
 - ✅ Optimal settings for indoor lighting: exposure=2002, gain=16
 - ✅ Real-time white balance in GStreamer pipeline using frei0r
 
@@ -273,8 +273,8 @@ feh capture.png
    - Gain LUT from reference driver with verified values
 
 3. ✅ **Gray World White Balance**
-   - Implemented in GStreamer pipeline using `frei0r-filter-coloradj-rgb`
-   - Calculated gains: R=1.414, G=1.000, B=1.283
+   - Implemented in GStreamer pipeline using two `frei0r-filter-levels` stages (per-channel multiply)
+   - Tuned gains: R=1.77, G=1.000, B=1.54 (tuned with tune_wb.sh)
    - Applied during Bayer-to-RGB conversion in userspace
    - Sensor has no hardware white balance registers
 
@@ -293,7 +293,7 @@ v4l2-ctl -d /dev/v4l-subdev6 --set-ctrl exposure=2002
 # Gain: Maximum LUT index (16 = 15.8x gain)
 v4l2-ctl -d /dev/v4l-subdev6 --set-ctrl analogue_gain=16
 
-# White balance: Applied in GStreamer (R=1.414, G=1.000, B=1.283)
+# White balance: Applied in GStreamer (R=1.77, G=1.000, B=1.54)
 ```
 
 **Key Discoveries:**
@@ -307,8 +307,8 @@ v4l2-ctl -d /dev/v4l-subdev6 --set-ctrl analogue_gain=16
 - Driver implements V4L2 control ops (`s_ctrl`) for real-time adjustment
 - Gain uses lookup table with 17 entries (index 0-16)
 - Exposure range validated: 4-2002 lines (VTS-2)
-- GStreamer pipeline uses frei0r RGB color adjustment filter
-- White balance parameters: r=0.707, g=0.500, b=0.641 (frei0r scale)
+- GStreamer pipeline uses two frei0r `levels` stages for per-channel WB
+- levels input-white-level = 1/gain: red=0.565 (gain 1.77), blue=0.649 (gain 1.54); tune with tune_wb.sh
 
 **Achievements:**
 - ✅ Natural color reproduction without green tint

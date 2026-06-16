@@ -25,11 +25,11 @@ CARD_LABEL="${CARD_LABEL:-GC2607 Camera}"
 EXPOSURE="${EXPOSURE:-2002}"
 GAIN="${GAIN:-16}"
 
-# Hardcoded gray-world white-balance gains (measured with calculate_wb_gains.py).
-# Green dominates the raw Bayer stream, so red/blue are boosted relative to green.
-R_GAIN="${R_GAIN:-1.414}"
-G_GAIN="${G_GAIN:-1.000}"
-B_GAIN="${B_GAIN:-1.283}"
+# Hardcoded white-balance gains (tuned with tune_wb.sh until R/G=B/G=1.0 at the
+# pipeline output). Green dominates the raw Bayer stream, so red/blue are boosted
+# relative to green. Applied as per-channel frei0r "levels" multipliers.
+R_GAIN="${R_GAIN:-1.77}"
+B_GAIN="${B_GAIN:-1.54}"
 
 log() { echo "[gc2607-stream] $*"; }
 
@@ -90,10 +90,12 @@ fi
 log "Virtual camera: $VIRT_DEV  (label: \"$CARD_LABEL\")"
 
 # --- 6. White balance --------------------------------------------------------
-# frei0r coloradj_RGB: param = 0.5 * gain, clamped to [0,1] (gain range 0..2x).
-clamp() { awk -v g="$1" 'BEGIN{p=0.5*g; if(p>1)p=1; if(p<0)p=0; printf "%.3f", p}'; }
-R_PARAM=$(clamp "$R_GAIN"); G_PARAM=$(clamp "$G_GAIN"); B_PARAM=$(clamp "$B_GAIN")
-log "White balance gains: R=$R_GAIN G=$G_GAIN B=$B_GAIN (frei0r r=$R_PARAM g=$G_PARAM b=$B_PARAM)"
+# Per-channel multiply via frei0r "levels": input-white-level = 1/gain boosts a
+# channel by `gain`. Green is the reference (untouched). show-histogram=false is
+# mandatory (it defaults to true and would overlay a histogram on the video).
+iw() { awk -v g="$1" 'BEGIN{w=1.0/g; if(w>1)w=1; if(w<0.05)w=0.05; printf "%.4f", w}'; }
+RW=$(iw "$R_GAIN"); BW=$(iw "$B_GAIN")
+log "White balance: R_GAIN=$R_GAIN (input-white=$RW)  B_GAIN=$B_GAIN (input-white=$BW)"
 
 # --- 7. Stream ---------------------------------------------------------------
 log "Streaming $CAM_DEV -> $VIRT_DEV ($OUT_FORMAT ${FPS}fps). Ctrl+C to stop."
@@ -104,7 +106,8 @@ exec gst-launch-1.0 -e \
     videoflip method=rotate-180 ! \
     videoconvert ! \
     "video/x-raw,format=RGBA" ! \
-    frei0r-filter-coloradj-rgb r="$R_PARAM" g="$G_PARAM" b="$B_PARAM" keep-luma=false ! \
+    frei0r-filter-levels channel=0.0 input-white-level="$RW" show-histogram=false ! \
+    frei0r-filter-levels channel=0.2 input-white-level="$BW" show-histogram=false ! \
     videoconvert ! \
     "video/x-raw,format=$OUT_FORMAT,framerate=$FPS/1" ! \
     v4l2sink device="$VIRT_DEV" sync=false
